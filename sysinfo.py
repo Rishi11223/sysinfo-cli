@@ -140,12 +140,72 @@ def get_de():
     return "N/A"
 
 
+def collect_all():
+    data = {}
+    data["hostname"] = socket.gethostname()
+    data["username"] = os.environ.get('USER', os.environ.get('USERNAME', 'unknown'))
+    data["os"] = f"{platform.system()} {platform.release()}"
+    data["kernel"] = platform.version()
+    data["arch"] = platform.machine()
+    data["uptime"] = str(get_uptime())
+    data["shell"] = get_shell()
+    data["terminal"] = get_terminal()
+    data["de"] = get_de()
+    data["packages"] = get_packages()
+    data["resolution"] = get_resolution()
+    data["cpu"] = get_cpu_info()
+    data["cpu_usage"] = round(get_cpu_usage(), 1)
+
+    try:
+        import psutil
+        mem_total, mem_used = get_memory()
+        disk_total, disk_used = get_disk()
+        data["memory"] = {"total": mem_total, "used": mem_used}
+        data["disk"] = {"total": disk_total, "used": disk_used}
+        data["processes"] = len(psutil.pids())
+        data["users"] = len(psutil.users())
+    except ImportError:
+        data["memory"] = None
+        data["disk"] = None
+
+    data["network"] = get_network()
+    return data
+
+
+def output_json(data):
+    import json
+    print(json.dumps(data, indent=2))
+
+
+def output_simple(data):
+    print(f"{data['username']}@{data['hostname']}")
+    print(f"{data['os']} | {data['arch']} | {data['cpu']}")
+    print(f"RAM: {get_size(data['memory']['used'])}/{get_size(data['memory']['total'])}" if data['memory'] else "RAM: N/A")
+    print(f"Disk: {get_size(data['disk']['used'])}/{get_size(data['disk']['total'])}" if data['disk'] else "Disk: N/A")
+    print(f"Uptime: {data['uptime']}")
+
+
 def main():
+    parser = argparse.ArgumentParser(description="Cross-platform system information tool")
+    parser.add_argument("--json", action="store_true", help="Output as JSON")
+    parser.add_argument("--simple", action="store_true", help="Minimal output (one line per section)")
+    args = parser.parse_args()
+
     try:
         import psutil
         HAS_PSUTIL = True
     except ImportError:
         HAS_PSUTIL = False
+
+    if args.json:
+        data = collect_all()
+        output_json(data)
+        return
+
+    if args.simple:
+        data = collect_all()
+        output_simple(data)
+        return
 
     hostname = socket.gethostname()
     username = os.environ.get('USER', os.environ.get('USERNAME', 'unknown'))
